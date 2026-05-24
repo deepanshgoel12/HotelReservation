@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - Hotel Reservation</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<nav class="nav">
+    <div class="brand">Hotel Reservation - Admin</div>
+    <div>
+        <a href="../index.html">Home</a>
+        <a href="./login.html" id="logout">Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card" id="loginCard">
+        <div class="h1">Admin Login</div>
+        <div id="alert"></div>
+        <div class="row">
+            <div>
+                <label class="label">Username</label>
+                <input class="input" id="adminUser" value="admin">
+            </div>
+            <div>
+                <label class="label">Password</label>
+                <input class="input" id="adminPass" type="password" value="admin123">
+            </div>
+        </div>
+        <div style="margin-top:14px;">
+            <button class="btn" id="adminLoginBtn">Login as Admin</button>
+        </div>
+    </div>
+
+    <div class="card" id="adminPanel" style="display:none;">
+        <div class="h2">Add Hotel</div>
+        <div id="alert2"></div>
+        <div class="row">
+            <div>
+                <label class="label">Hotel Name</label>
+                <input class="input" id="hotelName" placeholder="Sunset Residency">
+            </div>
+            <div>
+                <label class="label">Price per Night</label>
+                <input class="input" id="price" type="number" placeholder="2000">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label class="label">City</label>
+                <input class="input" id="city" placeholder="Mumbai">
+            </div>
+            <div>
+                <label class="label">State</label>
+                <input class="input" id="state" placeholder="Maharashtra">
+            </div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+            <button class="btn" id="addHotelBtn">Add Hotel</button>
+            <button class="btn secondary" id="refreshBtn">Refresh Hotels</button>
+        </div>
+    </div>
+
+    <div class="card" id="hotelsCard" style="display:none;">
+        <div class="h2">All Hotels</div>
+        <table class="table" id="hotelsTable">
+            <thead>
+            <tr><th>ID</th><th>Name</th><th>City</th><th>State</th><th>Price</th><th>Active</th><th>Actions</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script type="module">
+    import { apiRequest } from '../js/api.js';
+    import { qs, setAlert, storage } from '../js/common.js';
+
+    let adminToken = storage.get('adminToken');
+
+    const loginCard = qs('#loginCard');
+    const adminPanel = qs('#adminPanel');
+    const hotelsCard = qs('#hotelsCard');
+    const hotelsBody = qs('#hotelsTable tbody');
+
+    const alertBox = qs('#alert');
+    const alertBox2 = qs('#alert2');
+    const loginBtn = qs('#adminLoginBtn');
+
+    // Logout
+    qs('#logout').addEventListener('click', () => {
+        storage.remove('adminToken');
+        window.location.reload();
+    });
+
+    // Load Hotels
+    async function loadHotels() {
+        try {
+            const res = await apiRequest('/hotels/admin/all');
+            hotelsBody.innerHTML = '';
+            (res.hotels || []).forEach(h => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td>${h.id}</td>
+                <td>${h.hotelName}</td>
+                <td>${h.city}</td>
+                <td>${h.state}</td>
+                <td>${h.pricePerNight ?? '-'}</td>
+                <td>${h.isActive ? '<span class="badge success">Active</span>' : '<span class="badge danger">Inactive</span>'}</td>
+                <td>
+                    <button class="btn danger" data-id="${h.id}">Remove</button>
+                </td>
+            `;
+                hotelsBody.appendChild(tr);
+            });
+
+            hotelsBody.querySelectorAll('button[data-id]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    try {
+                        await apiRequest(`/hotels/admin/${id}`, { method: 'DELETE' });
+                        setAlert(alertBox2, 'success', 'Hotel removed.');
+                        await loadHotels();
+                    } catch (e) {
+                        setAlert(alertBox2, 'danger', e.message);
+                    }
+                });
+            });
+
+        } catch (e) {
+            setAlert(alertBox, 'danger', e.message);
+        }
+    }
+
+    // Admin Login
+    loginBtn.addEventListener('click', async () => {
+        try {
+            const res = await apiRequest('/auth/admin/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: qs('#adminUser').value.trim(),
+                    password: qs('#adminPass').value
+                })
+            });
+            setAlert(alertBox, 'success', 'Logged in as admin.');
+            loginCard.style.display = 'none';
+            adminPanel.style.display = '';
+            hotelsCard.style.display = '';
+            await loadHotels();
+        } catch (e) {
+            setAlert(alertBox, 'danger', e.message);
+        }
+    });
+
+    // Add Hotel
+    qs('#addHotelBtn').addEventListener('click', async () => {
+        const payload = {
+            hotelName: qs('#hotelName').value.trim(),
+            pricePerNight: Number(qs('#price').value) || null,
+            city: qs('#city').value.trim(),
+            state: qs('#state').value.trim()
+        };
+        if (!payload.hotelName || !payload.city || !payload.state) {
+            return setAlert(alertBox2, 'danger', 'Name, City, and State are required.');
+        }
+        try {
+            await apiRequest('/hotels/admin/add', { method: 'POST', body: JSON.stringify(payload) });
+            setAlert(alertBox2, 'success', 'Hotel added successfully.');
+            await loadHotels();
+        } catch (e) {
+            setAlert(alertBox2, 'danger', e.message);
+        }
+    });
+
+    // Refresh Hotels
+    qs('#refreshBtn').addEventListener('click', loadHotels);
+
+    // Auto-login if token exists
+    if (adminToken) {
+        loginCard.style.display = 'none';
+        adminPanel.style.display = '';
+        hotelsCard.style.display = '';
+        loadHotels();
+    }
+</script>
+</body>
+</html>

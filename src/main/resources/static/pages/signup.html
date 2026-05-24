@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Signup - Hotel Reservation</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<nav class="nav">
+    <div class="brand">Hotel Reservation</div>
+    <div>
+        <a href="../index.html">Home</a>
+        <a href="./login.html">Login</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <div class="h1">Create your account</div>
+        <div id="alert"></div>
+        <div class="row">
+            <div>
+                <label class="label">Full Name</label>
+                <input class="input" id="fullName" placeholder="John Doe">
+            </div>
+            <div>
+                <label class="label">Phone</label>
+                <input class="input" id="phone" placeholder="9876543210">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label class="label">Username</label>
+                <input class="input" id="username" placeholder="john123">
+            </div>
+            <div>
+                <label class="label">Email</label>
+                <input class="input" id="email" type="email" placeholder="john@email.com">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label class="label">Password</label>
+                <input class="input" id="password" type="password" placeholder="••••••">
+            </div>
+            <div>
+                <label class="label">Confirm Password</label>
+                <input class="input" id="confirmPassword" type="password" placeholder="••••••">
+            </div>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:10px;">
+            <button class="btn" id="signupBtn">Create account</button>
+            <a class="btn secondary" href="./login.html">Login</a>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { apiRequest } from '../js/api.js';
+    import { qs, setAlert } from '../js/common.js';
+
+    const btn = qs('#signupBtn');
+    const alertBox = qs('#alert');
+
+    btn.addEventListener('click', async () => {
+        const user = {
+            fullName: qs('#fullName').value.trim(),
+            phoneNumber: qs('#phone').value.trim(),
+            username: qs('#username').value.trim(),
+            email: qs('#email').value.trim(),
+            password: qs('#password').value
+        };
+        const confirm = qs('#confirmPassword').value;
+        if (!user.fullName || !user.username || !user.email || !user.password) {
+            return setAlert(alertBox, 'danger', 'Please fill all required fields.');
+        }
+        if (user.password.length < 6) {
+            return setAlert(alertBox, 'danger', 'Password must be at least 6 characters.');
+        }
+        if (user.password !== confirm) {
+            return setAlert(alertBox, 'danger', 'Passwords do not match.');
+        }
+
+        btn.disabled = true;
+        try {
+            const res = await apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(user) });
+            setAlert(alertBox, 'success', res.message || 'Registered successfully. Redirecting...');
+            setTimeout(() => window.location.href = './login.html', 1000);
+        } catch (e) {
+            setAlert(alertBox, 'danger', e.message);
+        } finally { btn.disabled = false; }
+    });
+</script>
+</body>
+</html>

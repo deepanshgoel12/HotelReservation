@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login - Hotel Reservation</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<nav class="nav">
+    <div class="brand">Hotel Reservation</div>
+    <div>
+        <a href="../index.html">Home</a>
+        <a href="./signup.html">Signup</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <div class="h1">Login</div>
+        <div id="alert"></div>
+        <div class="row">
+            <div>
+                <label class="label">Username or Email</label>
+                <input class="input" id="usernameOrEmail" placeholder="john123 or john@email.com">
+            </div>
+            <div>
+                <label class="label">Password</label>
+                <input class="input" id="password" type="password" placeholder="••••••">
+            </div>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:10px;">
+            <button class="btn" id="loginBtn">Login</button>
+            <a class="btn secondary" href="./admin.html">Admin Login</a>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { apiRequest } from '../js/api.js';
+    import { storage, qs, setAlert } from '../js/common.js';
+
+    const btn = qs('#loginBtn');
+    const alertBox = qs('#alert');
+
+    btn.addEventListener('click', async () => {
+        const payload = {
+            usernameOrEmail: qs('#usernameOrEmail').value.trim(),
+            password: qs('#password').value
+        };
+        if (!payload.usernameOrEmail || !payload.password) {
+            return setAlert(alertBox, 'danger', 'Please enter credentials.');
+        }
+        if (payload.password.length < 6) {
+            return setAlert(alertBox, 'danger', 'Password must be at least 6 characters.');
+        }
+
+        btn.disabled = true;
+        try {
+            const res = await apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(payload) });
+            storage.set('user', res.user);       // Save user info
+            window.location.href = './dashboard.html';
+        } catch (e) {
+            setAlert(alertBox, 'danger', e.message);
+        } finally { btn.disabled = false; }
+    });
+</script>
+</body>
+</html>

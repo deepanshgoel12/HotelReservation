@@ -1,0 +1,16 @@
+com\hotelreservation\repository\BookingRepository.class
+com\hotelreservation\entity\Booking.class
+com\hotelreservation\entity\BookingStatus.class
+com\hotelreservation\service\BookingService.class
+com\hotelreservation\entity\User.class
+com\hotelreservation\controller\HotelController.class
+com\hotelreservation\service\UserService.class
+com\hotelreservation\controller\AdminController.class
+com\hotelreservation\repository\HotelRepository.class
+com\hotelreservation\service\HotelService.class
+com\hotelreservation\SecurityConfig.class
+com\hotelreservation\controller\BookingController.class
+com\hotelreservation\entity\Hotel.class
+com\hotelreservation\controller\AuthController.class
+com\hotelreservation\repository\UserRepository.class
+com\hotelreservation\HotelReservationApplication.class

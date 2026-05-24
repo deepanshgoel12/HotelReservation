@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - Hotel Reservation</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<nav class="nav">
+    <div class="brand">Hotel Reservation - Dashboard</div>
+    <div>
+        <a href="../index.html">Home</a>
+        <a href="./login.html" id="logout">Logout</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="grid">
+        <div class="card">
+            <div class="h2">Book a Hotel</div>
+            <div id="alert"></div>
+            <div class="row">
+                <div>
+                    <label class="label">City</label>
+                    <input class="input" id="city" placeholder="Mumbai">
+                </div>
+                <div>
+                    <label class="label">State</label>
+                    <input class="input" id="state" placeholder="Maharashtra">
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <button class="btn" id="searchBtn">Search Hotels</button>
+            </div>
+
+            <div class="h2" style="margin-top:16px;">Available Hotels</div>
+            <div class="table-scroll">
+            <table class="table minw" id="hotelsTable">
+                <thead>
+                <tr>
+                    <th>ID</th><th>Name</th><th>City</th><th>State</th><th>Price</th>
+                    <th>Check-in</th><th>Check-out</th><th></th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="h2">My Bookings</div>
+            <table class="table" id="bookingsTable">
+                <thead>
+                <tr>
+                    <th>ID</th><th>Hotel</th><th>Check-in</th><th>Check-out</th><th>Status</th><th>Actions</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { apiRequest } from '../js/api.js';
+    import { storage, qs, setAlert, formatDate } from '../js/common.js';
+
+    const user = storage.get('user');
+
+    if (!user) window.location.href = './login.html';
+
+    // Logout
+    qs('#logout').addEventListener('click', () => {
+        storage.remove('user');
+        // no token storage
+        window.location.href = './login.html';
+    });
+
+    const hotelsBody = qs('#hotelsTable tbody');
+    const bookingsBody = qs('#bookingsTable tbody');
+    const alertBox = qs('#alert');
+
+    // Load user bookings
+    async function loadMyBookings() {
+        try {
+            const res = await apiRequest(`/bookings/user/${user.id}`);
+            bookingsBody.innerHTML = '';
+            (res.bookings || []).forEach(b => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td>${b.id}</td>
+                <td>${b.hotel?.hotelName ?? '-'}</td>
+                <td>${formatDate(b.checkInDate)}</td>
+                <td>${formatDate(b.checkOutDate)}</td>
+                <td>
+                    <span class="badge ${b.status === 'ACTIVE' ? 'success' : b.status === 'CANCELLED' ? 'danger' : 'warn'}">${b.status}</span>
+                </td>
+                <td>
+                    ${b.status === 'ACTIVE' ? `<button class="btn danger" data-cancel="${b.id}">Cancel</button>` : ''}
+                </td>
+            `;
+                bookingsBody.appendChild(tr);
+            });
+
+            bookingsBody.querySelectorAll('button[data-cancel]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-cancel');
+                    try {
+                        await apiRequest(`/bookings/${id}/cancel`, { method: 'PUT', body: JSON.stringify({ userId: user.id }) });
+                        setAlert(alertBox, 'success', 'Booking cancelled successfully.');
+                        await loadMyBookings();
+                    } catch (e) {
+                        setAlert(alertBox, 'danger', e.message);
+                    }
+                });
+            });
+        } catch (e) {
+            setAlert(alertBox, 'danger', e.message);
+        }
+    }
+
+    // Search Hotels
+    async function searchHotels() {
+        const city = qs('#city').value.trim();
+        const state = qs('#state').value.trim();
+        let res;
+
+        try {
+            if (city && state) {
+                res = await apiRequest(`/hotels/search/city?city=${encodeURIComponent(city)}`);
+                // optional client-side filter for state
+                res.hotels = (res.hotels || []).filter(h => h.state.toLowerCase() === state.toLowerCase());
+            } else if (city) {
+                res = await apiRequest(`/hotels/search/city?city=${encodeURIComponent(city)}`);
+            } else if (state) {
+                res = await apiRequest(`/hotels/search/state?state=${encodeURIComponent(state)}`);
+            } else {
+                res = await apiRequest('/hotels');
+            }
+            renderHotels(res.hotels || []);
+        } catch (e) {
+            setAlert(alertBox, 'danger', e.message);
+        }
+    }
+
+    // Render hotels table
+    function renderHotels(hotels) {
+        hotelsBody.innerHTML = '';
+        hotels.forEach(h => {
+            const tr = document.createElement('tr');
+            const today = formatDate(new Date());
+            const tomorrow = formatDate(new Date(Date.now() + 86400000));
+            tr.innerHTML = `
+            <td>${h.id}</td>
+            <td>${h.hotelName}</td>
+            <td>${h.city}</td>
+            <td>${h.state}</td>
+            <td>${h.pricePerNight ?? '-'}</td>
+            <td><input class="input" style="min-width:150px" type="date" value="${today}"></td>
+            <td><input class="input" style="min-width:150px" type="date" value="${tomorrow}"></td>
+            <td><button class="btn" data-book="${h.id}">Book</button></td>
+        `;
+            hotelsBody.appendChild(tr);
+        });
+
+        hotelsBody.querySelectorAll('button[data-book]').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const tr = e.target.closest('tr');
+                const inputs = tr.querySelectorAll('input[type="date"]');
+                const checkIn = inputs[0].value;
+                const checkOut = inputs[1].value;
+                const hotelId = btn.getAttribute('data-book');
+
+                try {
+                    await apiRequest('/bookings/create', {
+                        method: 'POST',
+                        body: JSON.stringify({ userId: user.id, hotelId: Number(hotelId), checkInDate: checkIn, checkOutDate: checkOut })
+                    });
+                    setAlert(alertBox, 'success', 'Booking created successfully.');
+                    await loadMyBookings();
+                } catch (err) {
+                    setAlert(alertBox, 'danger', err.message);
+                }
+            });
+        });
+    }
+
+    // Event Listeners
+    qs('#searchBtn').addEventListener('click', searchHotels);
+
+    // Initial load
+    searchHotels();
+    loadMyBookings();
+</script>
+</body>
+</html>
